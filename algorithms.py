@@ -3,6 +3,7 @@ import heapq
 import math
 import time
 
+
 def haversine_distance(lat1, lon1, lat2, lon2):
     """Tính khoảng cách chim bay theo mét giữa hai tọa độ địa lý (Haversine formula)."""
     R = 6371000.0  # bán kính Trái Đất (mét)
@@ -13,16 +14,32 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
     return R * c
 
+
 def _get_edge_length(G, u, v):
-    """Lấy chiều dài nhỏ nhất (mét) giữa 2 nút u và v trên MultiDiGraph."""
+    """Lấy chiều dài nhỏ nhất (mét) giữa 2 nút u và v trên MultiDiGraph hoặc DiGraph."""
     edge_dict = G[u][v]
-    if hasattr(edge_dict, "values"):
+    if hasattr(G, "is_multigraph") and G.is_multigraph():
         return min(float(d.get("length", 1.0)) for d in edge_dict.values())
     return float(edge_dict.get("length", 1.0))
 
+
+def _match_node(G, node):
+    """Tự động chuyển đổi giữa int và str để tương thích 100% với kiểu nút của đồ thị G."""
+    if node in G:
+        return node
+    if isinstance(node, str) and node.isdigit() and int(node) in G:
+        return int(node)
+    if str(node) in G:
+        return str(node)
+    return node
+
+
 def dijkstra(G, source, target):
     """Thuật toán Dijkstra tìm đường đi ngắn nhất từ source đến target."""
+    source = _match_node(G, source)
+    target = _match_node(G, target)
     t0 = time.perf_counter()
+
     if source == target:
         return {
             "found": True,
@@ -82,9 +99,13 @@ def dijkstra(G, source, target):
         "nodes": path,
     }
 
+
 def astar(G, source, target):
     """Thuật toán A* tìm đường đi ngắn nhất từ source đến target với heuristic Haversine."""
+    source = _match_node(G, source)
+    target = _match_node(G, target)
     t0 = time.perf_counter()
+
     if source == target:
         return {
             "found": True,
