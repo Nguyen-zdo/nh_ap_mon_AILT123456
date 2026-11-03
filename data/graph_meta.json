@@ -1,0 +1,19 @@
+{
+  "area": "Hoàn Kiếm cũ (GeoJSON, 5.17 km²)",
+  "network_type": "drive",
+  "download_date": "2026-11-02",
+  "raw": {
+    "nodes": 431,
+    "edges": 994,
+    "scc": 14,
+    "oneway_edges": 318
+  },
+  "clean": {
+    "nodes": 414,
+    "edges": 977,
+    "scc": 1,
+    "oneway_edges": 309
+  },
+  "osmnx_version": "2.1.1",
+  "attribution": "© OpenStreetMap contributors (ODbL)"
+}
