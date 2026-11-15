@@ -153,8 +153,20 @@ def run_hard_cases(G_clean):
     raw_path = ROOT / "data" / "area_raw.graphml"
     if raw_path.exists():
         G_raw = nx.read_graphml(raw_path)
-        # Nút 6689296377 thuộc thành phần liên thông bị cô lập trong đồ thị thô
-        s_unreach, t_unreach = "6689296377", "98009339"
+        # Tự động tìm 2 nút thuộc các thành phần không liên thông trong G_raw
+        s_unreach, t_unreach = None, None
+        sccs = sorted(nx.strongly_connected_components(G_raw), key=len, reverse=True)
+        if len(sccs) > 1:
+            main_scc = sccs[0]
+            for comp in sccs[1:]:
+                u = list(comp)[0]
+                v = list(main_scc)[0]
+                if not nx.has_path(G_raw, u, v):
+                    s_unreach, t_unreach = u, v
+                    break
+        if s_unreach is None or t_unreach is None:
+            s_unreach, t_unreach = "12531792527", "13169350041"
+
         res_un = dijkstra(G_raw, s_unreach, t_unreach)
         print("\n[Trường hợp 2 - Ngõ cụt / Không có đường đi]:")
         print(f"  * Thử tìm đường giữa 2 nút không liên thông: {s_unreach} -> {t_unreach}")

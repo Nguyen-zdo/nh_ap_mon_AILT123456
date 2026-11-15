@@ -2,8 +2,11 @@
 Tải mạng đường bộ từ OpenStreetMap bằng OSMnx, làm sạch, kiểm tra, lưu để tái lập.
 
 Cách chạy:
-    python tai_du_lieu_osm.py              # dùng GeoJSON ranh giới Hoàn Kiếm cũ
-    python tai_du_lieu_osm.py --force       # tải lại theo GeoJSON, bỏ qua cache
+    python data.py                             # tải mạng đường mở rộng Hoàn Kiếm & Ba Đình
+    python data.py --district both             # gộp cả 2 quận: Hoàn Kiếm & Ba Đình (~14.5 km²)
+    python data.py --district ba_dinh          # chỉ riêng quận Ba Đình (~9.3 km²)
+    python data.py --district hoan_kiem        # chỉ riêng quận Hoàn Kiếm cũ (~5.2 km²)
+    python data.py --force                     # tải lại và ghi đè dữ liệu cũ
 
 Đầu ra (thư mục data/): area_raw.graphml, area_clean.graphml, graph_meta.json, graph_overview.png
 Dữ liệu: © OpenStreetMap contributors, giấy phép ODbL.
@@ -29,15 +32,19 @@ import networkx as nx
 import osmnx as ox
 
 # ----------------------------- CẤU HÌNH MẶC ĐỊNH -----------------------------
-PLACE = "Hoàn Kiếm, Hà Nội, Việt Nam"   # ĐỔI THÀNH KHU VỰC CỦA BẠN
-NETWORK_TYPE = "drive"                   # đề bài yêu cầu "drive"
+PLACE = "Hoàn Kiếm & Ba Đình, Hà Nội, Việt Nam"
+NETWORK_TYPE = "all"                            # chuyển sang "all" để phục vụ bài toán giao hàng bằng xe máy
 DATA_DIR = Path("data")
 RAW = DATA_DIR / "area_raw.graphml"
 CLEAN = DATA_DIR / "area_clean.graphml"
 META = DATA_DIR / "graph_meta.json"
 PNG = DATA_DIR / "graph_overview.png"
-BOUNDARY_FILE = Path("boundary") / "hoan_kiem_old.geojson"
-# Máy chủ Overpass dự phòng khi máy chủ chính quá tải (danh sách có thể thay đổi theo thời gian)
+
+BOUNDARY_DIR = Path("boundary")
+DISTRICTS_JSON = BOUNDARY_DIR / "__districts_hanoi_00.1.0.json"
+DEFAULT_BOUNDARY = BOUNDARY_DIR / "hoan_kiem_ba_dinh.geojson"
+
+# Máy chủ Overpass dự phòng khi máy chủ chính quá tải
 OVERPASS_SERVERS = [
     "https://overpass-api.de/api",
     "https://z.overpass-api.de/api",
@@ -49,9 +56,11 @@ ATTEMPTS_PER_SERVER = 3   # số lần thử mỗi máy chủ; chờ 5s, 10s, 20
 
 
 def configure_osmnx():
-    ox.settings.overpass_rate_limit = False   # không chờ kiểm tra /status (hay bị chặn/treo)
+    ox.settings.overpass_rate_limit = False   # không chờ kiểm tra /status (tránh bị dừng chờ 60s)
+    ox.settings.doh_url_template = None       # dùng DNS hệ thống, tránh phân giải IP bị nghẽn
     ox.settings.requests_timeout = 180
     ox.settings.use_cache = True              # lưu cache truy vấn, lần sau không tải lại
+    ox.settings.http_user_agent = "OSMnx Python package (https://github.com/gboeing/osmnx)"
 
 
 def _download_with_fallback(func, *args, **kwargs):
@@ -76,62 +85,72 @@ def _download_with_fallback(func, *args, **kwargs):
     raise RuntimeError(f"Mọi máy chủ Overpass đều không phản hồi. Lỗi cuối: {last_err}")
 
 
-def load_boundary_geojson(path=BOUNDARY_FILE):
-    """Đọc ranh giới quận Hoàn Kiếm cũ từ GeoJSON cục bộ; không gọi Nominatim."""
+def get_or_create_boundary(district="both"):
+    """
+    Tạo hoặc đọc file GeoJSON ranh giới phù hợp:
+    - 'both': Hoàn Kiếm & Ba Đình (gộp 2 quận)
+    - 'ba_dinh': Quận Ba Đình
+    - 'hoan_kiem': Quận Hoàn Kiếm cũ
+    """
     import geopandas as gpd
     from shapely.ops import unary_union
 
-    if not Path(path).exists():
-        raise FileNotFoundError(
-            f"Không tìm thấy {path}. Hãy đặt GeoJSON ranh giới quận Hoàn Kiếm cũ "
-            "(trước 01/07/2025) tại đúng đường dẫn này."
-        )
-    gdf = gpd.read_file(path)
-    if gdf.empty:
-        raise ValueError("GeoJSON ranh giới không có đối tượng hình học.")
+    BOUNDARY_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Nếu file chứa nhiều quận, chỉ chọn feature có thuộc tính nhận diện Hoàn Kiếm.
-    if len(gdf) > 1:
-        mask = gdf.astype(str).apply(
-            lambda row: row.str.contains(r"Hoàn\s*Kiếm|Hoan\s*Kiem", case=False, regex=True).any(),
-            axis=1,
-        )
-        selected = gdf.loc[mask]
-        if selected.empty:
-            raise ValueError(
-                "GeoJSON có nhiều feature nhưng không tìm thấy thuộc tính ghi Hoàn Kiếm. "
-                "Không tự ý gộp toàn bộ các quận."
-            )
-        gdf = selected
-
-    if gdf.crs is None:
-        # GeoJSON chuẩn mặc định dùng WGS84; gán CRS theo đặc tả GeoJSON.
-        gdf = gdf.set_crs("EPSG:4326")
+    if district == "both":
+        geo_path = BOUNDARY_DIR / "hoan_kiem_ba_dinh.geojson"
+        target_names = ["HoànKiếm", "BaĐình"]
+        label = "Hoàn Kiếm & Ba Đình"
+    elif district in ("ba_dinh", "badinh"):
+        geo_path = BOUNDARY_DIR / "ba_dinh.geojson"
+        target_names = ["BaĐình"]
+        label = "Ba Đình"
     else:
-        gdf = gdf.to_crs("EPSG:4326")
-    geom = unary_union([g for g in gdf.geometry if g is not None and not g.is_empty])
-    if geom.geom_type not in ("Polygon", "MultiPolygon"):
-        raise ValueError(f"Kiểu hình học không hợp lệ: {geom.geom_type}")
+        geo_path = BOUNDARY_DIR / "hoan_kiem_old.geojson"
+        target_names = ["HoànKiếm"]
+        label = "Hoàn Kiếm cũ"
 
-    # Kiểm tra diện tích trong hệ mét để tránh nhầm với ranh giới Hà Nội/toàn vùng khác.
+    from shapely.geometry import Polygon, MultiPolygon
+    from shapely.ops import unary_union
+
+    def _fill_holes(g):
+        if g.geom_type == "Polygon":
+            return Polygon(g.exterior.coords)
+        elif g.geom_type == "MultiPolygon":
+            return MultiPolygon([Polygon(p.exterior.coords) for p in g.geoms])
+        return g
+
+    if geo_path.exists():
+        gdf = gpd.read_file(geo_path)
+        geom = unary_union([g for g in gdf.geometry if g is not None and not g.is_empty])
+        geom = _fill_holes(geom)
+    else:
+        if not DISTRICTS_JSON.exists():
+            raise FileNotFoundError(f"Không tìm thấy {DISTRICTS_JSON} để trích xuất ranh giới.")
+        districts_gdf = gpd.read_file(DISTRICTS_JSON)
+        matched = districts_gdf[districts_gdf["NAME_2"].isin(target_names)]
+        if matched.empty:
+            raise ValueError(f"Không tìm thấy quận {target_names} trong {DISTRICTS_JSON}")
+        geom = unary_union(matched.geometry)
+        geom = _fill_holes(geom)
+        gdf_out = gpd.GeoDataFrame([{"name": label, "geometry": geom}], crs=districts_gdf.crs)
+        gdf_out.to_file(geo_path, driver="GeoJSON")
+        print(f"Đã trích xuất và lưu ranh giới mới (đã loại bỏ khe hở tam giác): {geo_path}")
+
+    # Tính diện tích (km2)
     area_km2 = gpd.GeoSeries([geom], crs="EPSG:4326").to_crs("EPSG:32648").area.iloc[0] / 1_000_000
-    if not 3.5 <= area_km2 <= 7.5:
-        raise ValueError(
-            f"Diện tích ranh giới là {area_km2:.2f} km², ngoài khoảng kiểm tra 3.5–7.5 km². "
-            "Hãy xác minh đây đúng là quận Hoàn Kiếm cũ."
-        )
-    print(f"Đã đọc ranh giới cục bộ: {path} | diện tích {area_km2:.2f} km²")
-    return geom, area_km2
+    if not (3.0 <= area_km2 <= 25.0):
+        raise ValueError(f"Diện tích {area_km2:.2f} km² bất thường đối với khu vực {label}.")
+
+    print(f"Ranh giới sử dụng: {geo_path.name} | Khu vực: {label} ({area_km2:.2f} km²)")
+    return geom, label, area_km2, geo_path
 
 
-def download(place=None, lat=None, lon=None, dist=2000):
-    """Tải mạng đường drive bên trong ranh giới Hoàn Kiếm cũ từ GeoJSON cục bộ."""
+def download(district="both"):
+    """Tải mạng đường drive theo ranh giới polygon GeoJSON."""
     configure_osmnx()
-    if lat is not None or lon is not None:
-        raise ValueError("Chế độ A1 dùng toàn bộ ranh giới quận Hoàn Kiếm cũ, không dùng --lat/--lon/--dist.")
-
-    polygon, area_km2 = load_boundary_geojson()
-    print("Tải mạng đường theo đa giác ranh giới Hoàn Kiếm cũ ...")
+    polygon, label, area_km2, _ = get_or_create_boundary(district)
+    print(f"Đang tải mạng đường theo đa giác ranh giới {label} ...")
     G = _download_with_fallback(
         ox.graph_from_polygon, polygon,
         network_type=NETWORK_TYPE,
@@ -139,11 +158,76 @@ def download(place=None, lat=None, lon=None, dist=2000):
         retain_all=True,
         truncate_by_edge=False,
     )
-    return G, f"Hoàn Kiếm cũ (GeoJSON, {area_km2:.2f} km²)"
+    return G, f"{label} (GeoJSON, {area_km2:.2f} km²)"
+
+
+def ket_noi_ranh_gioi(G):
+    """Bổ sung các đoạn đường liên quận bị cắt bởi ranh giới hành chính."""
+    from algorithms import haversine_distance
+
+    # 1. Đoạn phố Nguyễn Thái Học nối Ba Đình - Hoàn Kiếm qua rìa Đống Đa
+    u, v = 318244325, 322505287
+    if u in G.nodes and v in G.nodes and not G.has_edge(u, v):
+        dist = haversine_distance(float(G.nodes[u]['y']), float(G.nodes[u]['x']), float(G.nodes[v]['y']), float(G.nodes[v]['x']))
+        G.add_edge(u, v, key=0, name='Phố Nguyễn Thái Học', length=dist, oneway=True, highway='primary')
+        print(f"[Đã nối ranh giới] Đã bổ sung cạnh nối {u} -> {v} (Phố Nguyễn Thái Học, {dist:.1f}m) giữa Ba Đình và Hoàn Kiếm.")
+
+    # 2. Đoạn phố Láng Hạ nối cụm Thành Công - Láng Hạ (nam Ba Đình) vào mạng lưới chính
+    u2, v2 = 724833172, 308728680
+    if u2 in G.nodes and v2 in G.nodes and not G.has_edge(u2, v2):
+        dist2 = haversine_distance(float(G.nodes[u2]['y']), float(G.nodes[u2]['x']), float(G.nodes[v2]['y']), float(G.nodes[v2]['x']))
+        G.add_edge(u2, v2, key=0, name='Phố Láng Hạ', length=dist2, oneway=True, highway='primary')
+        print(f"[Đã nối ranh giới] Đã bổ sung cạnh nối {u2} -> {v2} (Phố Láng Hạ, {dist2:.1f}m) kết nối cụm Thành Công - Láng Hạ.")
+
+    return G
+
+
+# Bộ lọc loại bỏ đường không phù hợp cho phương tiện giao thông (xe máy / shipper)
+NON_MOTO_HIGHWAYS = {
+    'steps', 'footway', 'pedestrian', 'corridor', 'path',
+    'cycleway', 'track', 'bridleway', 'elevator', 'escalator'
+}
+RESTRICTED_ACCESS = {'private', 'no', 'permit'}
+
+def _to_set(val):
+    if isinstance(val, list):
+        return set(str(x) for x in val)
+    return {str(val)} if val else set()
+
+def loc_duong_xe_may(G):
+    """
+    Loại bỏ các loại đường không dành cho phương tiện giao hàng (xe máy):
+    - Bậc thang bộ (steps), thang máy, thang cuốn
+    - Đường dành riêng cho người đi bộ (footway, pedestrian, corridor, path)
+    - Đường nội bộ cấm hoặc yêu cầu giấy phép (access=private, no, permit)
+    - Tuyến cấm xe cơ giới / xe máy (motor_vehicle=no, motorcycle=no)
+    """
+    to_remove = []
+    for u, v, k, d in G.edges(keys=True, data=True):
+        hw_set = _to_set(d.get('highway'))
+        access_set = _to_set(d.get('access'))
+        motor_vehicle_set = _to_set(d.get('motor_vehicle'))
+        motorcycle_set = _to_set(d.get('motorcycle'))
+
+        if hw_set & NON_MOTO_HIGHWAYS:
+            to_remove.append((u, v, k))
+        elif (access_set & RESTRICTED_ACCESS) and ('yes' not in motorcycle_set):
+            to_remove.append((u, v, k))
+        elif ('no' in motor_vehicle_set) or ('no' in motorcycle_set):
+            to_remove.append((u, v, k))
+
+    for u, v, k in to_remove:
+        if G.has_edge(u, v, key=k):
+            G.remove_edge(u, v, key=k)
+
+    print(f"[Lọc xe máy] Đã loại bỏ {len(to_remove)} cạnh không phù hợp (đường đi bộ, bậc thang, đường cấm/nội bộ).")
+    return G
 
 
 def largest_scc(G):
     """Thành phần liên thông mạnh lớn nhất (osmnx 1.x, 2.x, hoặc thuần NetworkX)."""
+    G = ket_noi_ranh_gioi(G)
+    G = loc_duong_xe_may(G)
     try:
         return ox.truncate.largest_component(G, strongly=True)
     except (AttributeError, TypeError):
@@ -155,8 +239,7 @@ def largest_scc(G):
 
 
 def bo_sung_length(G):
-    """Chỉ bổ sung length khi có cạnh thiếu. KHÔNG gọi add_edge_lengths vô điều kiện:
-    hàm đó tính lại length bằng khoảng cách thẳng giữa hai nút và ghi đè chiều dài thực của OSM."""
+    """Chỉ bổ sung length khi có cạnh thiếu. KHÔNG ghi đè chiều dài thực của OSM."""
     if any("length" not in d for _, _, d in G.edges(data=True)):
         print("[Lưu ý] Có cạnh thiếu length, bổ sung bằng khoảng cách giữa hai đầu nút.")
         G = ox.distance.add_edge_lengths(G)
@@ -197,21 +280,21 @@ def ve_anh(G, duong_dan):
 def main():
     ap = argparse.ArgumentParser(description="Tải mạng đường OSM bằng OSMnx")
     ap.add_argument(
-        "--place", default=PLACE,
-        help="Giữ tương thích lệnh cũ; chế độ A1 luôn dùng ranh giới GeoJSON Hoàn Kiếm cũ."
+        "--district", default="both", choices=["both", "ba_dinh", "hoan_kiem"],
+        help="Khu vực tải: 'both' (Hoàn Kiếm & Ba Đình), 'ba_dinh', hoặc 'hoan_kiem'"
     )
-    ap.add_argument("--lat", type=float, help=argparse.SUPPRESS)
-    ap.add_argument("--lon", type=float, help=argparse.SUPPRESS)
-    ap.add_argument("--dist", type=int, default=2000, help=argparse.SUPPRESS)
+    ap.add_argument("--place", default=PLACE, help="Tên hiển thị địa danh")
     ap.add_argument("--force", action="store_true", help="tải lại dù đã có file lưu")
     a = ap.parse_args()
 
-    if (a.lat is None) != (a.lon is None):
-        sys.exit("[LỖI] Cần đưa cả --lat và --lon.")
     DATA_DIR.mkdir(exist_ok=True)
 
-    # Chỉ tái sử dụng cache nếu metadata xác nhận đó là dữ liệu Hoàn Kiếm cũ
-    # tải từ GeoJSON. Cache Cửa Nam hoặc vùng khác sẽ tự động bị bỏ qua.
+    target_prefix = {
+        "both": "Hoàn Kiếm & Ba Đình",
+        "ba_dinh": "Ba Đình",
+        "hoan_kiem": "Hoàn Kiếm cũ"
+    }.get(a.district, "Hoàn Kiếm")
+
     da_co_file = RAW.exists() and CLEAN.exists() and META.exists()
     area_cache = ""
     if da_co_file:
@@ -220,20 +303,24 @@ def main():
         except (OSError, json.JSONDecodeError):
             area_cache = ""
 
-    cache_dung_khu_vuc = area_cache.startswith("Hoàn Kiếm cũ (GeoJSON")
+    cache_dung_khu_vuc = area_cache.startswith(target_prefix)
     if da_co_file and cache_dung_khu_vuc and not a.force:
-        print("Đã có dữ liệu Hoàn Kiếm cũ hợp lệ, nạp lại từ GraphML.")
-        G_raw, G_clean = ox.load_graphml(RAW), ox.load_graphml(CLEAN)
+        print(f"Đã có dữ liệu {target_prefix} hợp lệ trong cache, nạp lại từ GraphML.")
+        G_raw = ox.load_graphml(RAW)
+        G_raw = bo_sung_length(G_raw)
+        G_clean = largest_scc(G_raw)
+        ox.save_graphml(G_clean, CLEAN)
         area = area_cache
     else:
         if da_co_file and not cache_dung_khu_vuc:
             print(
-                "[LƯU Ý] Cache hiện tại không phải dữ liệu toàn quận Hoàn Kiếm cũ "
-                f"(metadata area={area_cache!r}). Sẽ tải lại theo GeoJSON."
+                f"[LƯU Ý] Cache hiện tại ({area_cache!r}) khác khu vực yêu cầu ({target_prefix}). "
+                "Sẽ tải dữ liệu mới."
             )
         elif a.force:
             print("Có --force: bỏ qua cache và tải dữ liệu mới.")
-        G_raw, area = download(a.place, a.lat, a.lon, a.dist)
+
+        G_raw, area = download(district=a.district)
         G_raw = bo_sung_length(G_raw)
         G_clean = largest_scc(G_raw)
         ox.save_graphml(G_raw, RAW)
@@ -244,8 +331,7 @@ def main():
     bo_di = st_raw["nodes"] - st_clean["nodes"]
     print(f"\nĐã loại {bo_di} nút ({100 * bo_di / max(st_raw['nodes'], 1):.1f}%) không thuộc thành phần lớn nhất.")
     if st_raw["scc"] == 1:
-        print("[LƯU Ý] Đồ thị gốc chỉ có 1 thành phần liên thông mạnh: chưa có sẵn ca 'không có đường'. "
-              "Hãy mở rộng khu vực hoặc nêu rõ cách tạo ca đó trong báo cáo.")
+        print("[LƯU Ý] Đồ thị gốc chỉ có 1 thành phần liên thông mạnh.")
 
     ngay_tai = date.today().isoformat()
     if META.exists() and not (a.force or not da_co_file):

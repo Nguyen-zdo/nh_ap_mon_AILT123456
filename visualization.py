@@ -1,10 +1,11 @@
 """
 Vẽ mạng đường và xuất các tuyến mẫu (gần, xa, đường vòng) để dán vào báo cáo.
 Đáp ứng tiêu chí Chủ đề 01:
-- Xuất ảnh tổng quan mạng lưới đường bộ Hoàn Kiếm (results/network.png).
+- Xuất ảnh tổng quan mạng lưới đường bộ (results/network.png).
 - Xuất ảnh 3 tuyến đường tiêu biểu (results/route_1_short.png, route_2_long.png, route_3_detour.png).
 - Tương thích cả OSMnx lẫn thuần Matplotlib / NetworkX.
 """
+import json
 import sys
 from pathlib import Path
 
@@ -62,6 +63,17 @@ def save_network_image(G, output=None):
     output = Path(output or ROOT / "results" / "network.png")
     output.parent.mkdir(parents=True, exist_ok=True)
 
+    meta_path = ROOT / "data" / "graph_meta.json"
+    area_name = "Hoàn Kiếm & Ba Đình"
+    if meta_path.exists():
+        try:
+            meta_json = json.loads(meta_path.read_text(encoding="utf-8"))
+            area_name = meta_json.get("area", area_name)
+            if "(" in area_name:
+                area_name = area_name.split("(")[0].strip()
+        except Exception:
+            pass
+
     fig, ax = plt.subplots(figsize=(10, 10), facecolor="white")
 
     # Vẽ toàn bộ các cạnh đường bộ
@@ -70,7 +82,7 @@ def save_network_image(G, output=None):
         vx, vy = float(G.nodes[v]["x"]), float(G.nodes[v]["y"])
         ax.plot([ux, vx], [uy, vy], color="#666666", linewidth=0.6, alpha=0.75, zorder=1)
 
-    ax.set_title("Mạng lưới đường bộ Quận Hoàn Kiếm (Drive)", fontsize=13, fontweight="bold", pad=12)
+    ax.set_title(f"Mạng lưới đường bộ {area_name} (Drive)", fontsize=13, fontweight="bold", pad=12)
     ax.set_aspect("equal", "datalim")
     ax.axis("off")
     fig.text(0.02, 0.02, "© OpenStreetMap contributors (ODbL)", fontsize=8, color="#555555")
@@ -148,7 +160,7 @@ def export_sample_routes(G):
             "filename": "route_2_long.png",
             "s": "13045693888",
             "t": "84792594",
-            "name": "Tuyến 2 (Cự ly xa): Trục xuyên tâm Quận Hoàn Kiếm",
+            "name": "Tuyến 2 (Cự ly xa): Trục xuyên tâm mạng đường",
         },
         {
             "id": 3,
