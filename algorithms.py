@@ -15,12 +15,18 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     return R * c
 
 
-def _get_edge_length(G, u, v):
-    """Lấy chiều dài nhỏ nhất (mét) giữa 2 nút u và v trên MultiDiGraph hoặc DiGraph."""
+def _get_edge_length(G, u, v, traffic_weights=None):
+    """Lấy chiều dài hoặc trọng số có tính đến tắc đường giữa 2 nút u và v."""
+    if traffic_weights and (u, v) in traffic_weights:
+        return traffic_weights[(u, v)]
+
     edge_dict = G[u][v]
     if hasattr(G, "is_multigraph") and G.is_multigraph():
-        return min(float(d.get("length", 1.0)) for d in edge_dict.values())
-    return float(edge_dict.get("length", 1.0))
+        base_len = min(float(d.get("length", 1.0)) for d in edge_dict.values())
+    else:
+        base_len = float(edge_dict.get("length", 1.0))
+
+    return base_len
 
 
 def _match_node(G, node):
@@ -34,7 +40,7 @@ def _match_node(G, node):
     return node
 
 
-def dijkstra(G, source, target):
+def dijkstra(G, source, target, traffic_weights=None):
     """Thuật toán Dijkstra tìm đường đi ngắn nhất từ source đến target."""
     source = _match_node(G, source)
     target = _match_node(G, target)
@@ -47,12 +53,14 @@ def dijkstra(G, source, target):
             "time_s": time.perf_counter() - t0,
             "expanded": 0,
             "nodes": [source],
+            "visited_nodes": [source],
         }
 
     distances = {source: 0.0}
     predecessors = {}
     pq = [(0.0, source)]
     visited = set()
+    visited_order = []
     expanded = 0
 
     while pq:
@@ -60,13 +68,14 @@ def dijkstra(G, source, target):
         if u in visited:
             continue
         visited.add(u)
+        visited_order.append(u)
         expanded += 1
 
         if u == target:
             break
 
         for v in G.neighbors(u):
-            weight = _get_edge_length(G, u, v)
+            weight = _get_edge_length(G, u, v, traffic_weights)
             new_dist = dist_u + weight
             if new_dist < distances.get(v, float("inf")):
                 distances[v] = new_dist
@@ -81,6 +90,7 @@ def dijkstra(G, source, target):
             "time_s": t1 - t0,
             "expanded": expanded,
             "nodes": [],
+            "visited_nodes": visited_order,
         }
 
     # Tái tạo tuyến đường
@@ -97,10 +107,11 @@ def dijkstra(G, source, target):
         "time_s": t1 - t0,
         "expanded": expanded,
         "nodes": path,
+        "visited_nodes": visited_order,
     }
 
 
-def astar(G, source, target):
+def astar(G, source, target, traffic_weights=None):
     """Thuật toán A* tìm đường đi ngắn nhất từ source đến target với heuristic Haversine."""
     source = _match_node(G, source)
     target = _match_node(G, target)
@@ -113,6 +124,7 @@ def astar(G, source, target):
             "time_s": time.perf_counter() - t0,
             "expanded": 0,
             "nodes": [source],
+            "visited_nodes": [source],
         }
 
     target_lat = float(G.nodes[target]["y"])
@@ -128,6 +140,7 @@ def astar(G, source, target):
     predecessors = {}
     pq = [(f_score[source], 0.0, source)]
     visited = set()
+    visited_order = []
     expanded = 0
 
     while pq:
@@ -135,13 +148,14 @@ def astar(G, source, target):
         if u in visited:
             continue
         visited.add(u)
+        visited_order.append(u)
         expanded += 1
 
         if u == target:
             break
 
         for v in G.neighbors(u):
-            weight = _get_edge_length(G, u, v)
+            weight = _get_edge_length(G, u, v, traffic_weights)
             tentative_g = dist_u + weight
             if tentative_g < g_score.get(v, float("inf")):
                 g_score[v] = tentative_g
@@ -158,6 +172,7 @@ def astar(G, source, target):
             "time_s": t1 - t0,
             "expanded": expanded,
             "nodes": [],
+            "visited_nodes": visited_order,
         }
 
     # Tái tạo tuyến đường
@@ -174,4 +189,5 @@ def astar(G, source, target):
         "time_s": t1 - t0,
         "expanded": expanded,
         "nodes": path,
+        "visited_nodes": visited_order,
     }
