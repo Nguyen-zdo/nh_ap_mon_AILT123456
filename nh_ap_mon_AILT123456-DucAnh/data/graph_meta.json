@@ -1,0 +1,19 @@
+{
+  "area": "Hoàn Kiếm & Ba Đình (GeoJSON, 14.50 km²)",
+  "network_type": "all",
+  "download_date": "2026-11-15",
+  "raw": {
+    "nodes": 10907,
+    "edges": 15892,
+    "scc": 3543,
+    "oneway_edges": 1794
+  },
+  "clean": {
+    "nodes": 7216,
+    "edges": 15427,
+    "scc": 1,
+    "oneway_edges": 1647
+  },
+  "osmnx_version": "2.1.1",
+  "attribution": "© OpenStreetMap contributors (ODbL)"
+}
