@@ -93,30 +93,31 @@ python experiments.py
 ```bash
 python visualization.py
 ```
-6. KẾ HOẠCH GIAO DỮ LIỆU & ĐỐI NGUYÊN GIÁM SÁT (CITATION)
+## 6. KẾ HOẠCH GIAO DỮ LIỆU & ĐỐI NGUYÊN GIÁM SÁT (CITATION)
 Dữ liệu bản đồ: OpenStreetMap (OSM)
-Khu vực nghiên cứu: Khu vực Hoàn Kiếm cũ, Quận 1 – Hà Nội (mạng lưới network_type="drive")
-Thời điểm cập nhật dữ liệu: Tháng 09/2026 (trích xuất từ Geofabrik, dựa trên dữ liệu OSM tính đến ngày truy cập thực tế)
+Khu vực nghiên cứu: Khu vực Hoàn Kiếm cũ, Quận 1 – Hà Nội (network_type="drive")
+Thời điểm truy cập dữ liệu: Tháng 11/2026 (ngày cụ thể được ghi nhận tại thời điểm tải tệp)
 
 🔍 6.1. Thông tin về nguồn dữ liệu OpenStreetMap
-URL truy cập: https://www.openstreetmap.org/ (ngày truy cập cụ thể được ghi nhận tại thời điểm tải dữ liệu)
+URL truy cập: https://www.openstreetmap.org/ (ngày truy cập cụ thể được ghi lại khi tải dữ liệu)
 
-Nguồn trích xuất dữ liệu khu vực: Tệp vietnam-latest.osm.pbf từ Geofabrik, truy cập qua https://download.geofabrik.de/asia/vietnam.html. Cần lưu ý rằng Geofabrik cập nhật tệp trích xuất hàng ngày, do đó mốc thời gian "Tháng 09/2026" chỉ mang tính chất tham chiếu; ngày cập nhật thực tế của tệp PBF cần được ghi lại chính xác tại thời điểm tải (ví dụ: dựa trên trường last modified hoặc timestamp trong metadata của tệp) .
+Nguồn trích xuất dữ liệu khu vực: Tệp vietnam-latest.osm.pbf từ Geofabrik, truy cập qua https://download.geofabrik.de/asia/vietnam.html. Geofabrik cập nhật tệp trích xuất hàng ngày; do đó, mốc thời gian cần được xác định dựa trên timestamp thực tế của tệp tại thời điểm tải (trường last modified hoặc metadata), không nên ấn định một tháng cố định trước khi tải .
 
-Lệ phí sử dụng: Miễn phí. Dữ liệu OSM được phát hành theo Giấy phép Cơ sở dữ liệu mở Open Data Commons (ODbL), không phải CC-BY-SA. CC-BY-SA chỉ áp dụng cho tài liệu hướng dẫn của OSM, không áp dụng cho dữ liệu bản đồ .
+Lệ phí sử dụng: Miễn phí. Dữ liệu OSM được phát hành theo Giấy phép Cơ sở dữ liệu mở Open Data Commons (ODbL). CC-BY-SA chỉ áp dụng cho tài liệu hướng dẫn/wiki của OSM, không áp dụng cho dữ liệu bản đồ .
 
 ⚖️ 6.2. Điều khoản sử dụng & Nghĩa vụ ghi công
 Bản quyền dữ liệu: © OpenStreetMap contributors.
 
-Yêu cầu ghi công (theo ODbL): Khi sử dụng dữ liệu OSM trong một sản phẩm công bố (bao gồm báo cáo học thuật, bản đồ, hoặc cơ sở dữ liệu dẫn xuất), cần thực hiện đồng thời hai nghĩa vụ:
+Yêu cầu ghi công (theo ODbL): Khi công bố sản phẩm sử dụng dữ liệu OSM (bao gồm báo cáo học thuật, bản đồ, hoặc cơ sở dữ liệu dẫn xuất), cần thực hiện đồng thời hai nghĩa vụ :
 
 Ghi công "OpenStreetMap" là nguồn dữ liệu.
-Làm rõ rằng dữ liệu được cung cấp theo ODbL, thông qua liên kết đến https://www.openstreetmap.org/copyright hoặc trích dẫn toàn văn giấy phép .
+Làm rõ rằng dữ liệu được cung cấp theo ODbL, thông qua liên kết đến https://www.openstreetmap.org/copyright hoặc trích dẫn toàn văn giấy phép.
 Mẫu trích dẫn đề xuất: "Dữ liệu bản đồ © OpenStreetMap contributors, có sẵn theo Giấy phép Cơ sở dữ liệu mở (ODbL), https://www.openstreetmap.org/copyright, [Ngày truy cập]."
 
-Điều chỉnh dữ liệu: Dữ liệu đã được làm sạch (loại bỏ cạnh có độ dài < 0 m; tách các kết nối một chiều theo cấu hình osmnx.drive). Các thao tác này tạo ra một cơ sở dữ liệu dẫn xuất (Derivative Database); nếu công bố lại, cơ sở dữ liệu dẫn xuất này cũng phải được chia sẻ theo các điều khoản của ODbL ( điều khoản "Share-Alike" ) .
+Điều chỉnh dữ liệu: Dữ liệu đã được làm sạch (loại bỏ cạnh có độ dài < 0 m; tách các kết nối một chiều theo cấu hình osmnx.drive). Các thao tác này tạo ra một cơ sở dữ liệu dẫn xuất (Derivative Database); nếu công bố lại, cơ sở dữ liệu dẫn xuất này cũng phải được chia sẻ theo các điều khoản của ODbL (điều khoản "Share-Alike") .
 
 📜 6.3. Bản quyền & Ghi chú pháp lý
 Cơ sở pháp lý: ODbL 1.0. Nghĩa vụ ghi công và chia sẻ tương tự (Share-Alike) là bắt buộc đối với mọi hình thức sử dụng công khai dữ liệu hoặc cơ sở dữ liệu dẫn xuất .
 
 Rủi ro pháp lý: Không được sao chép, phân phối hoặc bán lại dữ liệu OSM như một sản phẩm thương mại độc lập mà không tuân thủ đầy đủ các điều khoản của ODbL. Việc sử dụng trong nghiên cứu học thuật (không thương mại) được cho phép với điều kiện thực hiện đúng nghĩa vụ ghi công và chia sẻ tương tự nếu có tạo lập cơ sở dữ liệu dẫn xuất .
+
