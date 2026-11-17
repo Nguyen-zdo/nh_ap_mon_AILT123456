@@ -301,10 +301,11 @@ def check_point_validity(G, node, click_coord, is_origin=True, is_preset=False, 
     Kiểm tra điểm chọn có hợp lệ để tạo tuyến đường xe chạy hay không:
     1. Khoảng cách bắt điểm (snapping): Nếu click tự do trên bản đồ mà cách đường gần nhất > max_dist (75m)
        (rơi vào mặt nước hồ Tây/Hồ Gươm, bãi cát sông Hồng, vùng không có đường) -> Từ chối.
-    2. Ngõ cụt (Cul-de-sac): Nút có tổng số nút lân cận vô hướng <= 1 -> Từ chối vì là ngõ cụt không thông.
-    3. Hướng di chuyển (One-way):
-       - S có out_degree == 0: Không có đường đi ra.
-       - T có in_degree == 0: Không có đường đi vào.
+    2. Ngõ cụt thực sự bị kẹt (Dead-end without exit/entry):
+       - Điểm xuất phát (S): nếu out_degree == 0 thì hoàn toàn không có đường đi ra (bị kẹt cứng trong ngõ cụt 1 chiều).
+       - Điểm đến (T): nếu in_degree == 0 thì hoàn toàn không có đường đi vào.
+    3. Đối với ngõ hai chiều hoặc đường gần mép ranh giới:
+       Phương tiện hoàn toàn có thể quay đầu/chạy ra khỏi ngõ để đi tiếp, hệ thống cho phép tìm đường bình thường.
     """
     if click_coord and not is_preset:
         n_lat = float(G.nodes[node]["y"])
@@ -317,23 +318,11 @@ def check_point_validity(G, node, click_coord, is_origin=True, is_preset=False, 
                 f"Vị trí này nằm ngoài mạng lưới đường bộ (mặt nước, bãi bồi ven sông hoặc khu vực không có đường ô tô tiếp cận)."
             )
 
-    preds = set(G.predecessors(node))
-    succs = set(G.successors(node))
-    neighbors = (preds | succs) - {node}
-
-    if len(neighbors) <= 1:
-        point_label = "Điểm xuất phát (S)" if is_origin else "Điểm đến (T)"
-        action = "xuất phát từ" if is_origin else "dẫn vào"
-        return False, (
-            f"🚫 **{point_label} nằm trong ngõ cụt / đường cụt** (chỉ có duy nhất 1 lối vào/ra, không có đường đi thông). "
-            f"Hệ thống không tạo lộ trình {action} ngõ cụt!"
-        )
-
     if is_origin and G.out_degree(node) == 0:
-        return False, "🚫 **Điểm xuất phát (S)** không có lối đi ra (bị chặn hướng di chuyển một chiều)."
+        return False, "🚫 **Điểm xuất phát (S) là ngõ cụt bị kẹt** (không có lối đi ra do đường một chiều bị chặn hướng)."
 
     if not is_origin and G.in_degree(node) == 0:
-        return False, "🚫 **Điểm đến (T)** không có lối đi vào (ngược chiều quy định hoặc bị chặn lối vào)."
+        return False, "🚫 **Điểm đến (T) không có lối đi vào** (đường một chiều ngược hướng di chuyển)."
 
     return True, ""
 
@@ -525,6 +514,10 @@ if route_calculated:
         """, unsafe_allow_html=True)
 
     st.caption(f"✅ Hai thuật toán cho cùng độ dài tối ưu: **{rd['distance_m']:.1f} m** (~{rd['distance_m']/1000:.2f} km) qua **{len(rd['nodes'])}** nút giao thông.")
+    s_nbrs = len((set(G.predecessors(s_node)) | set(G.successors(s_node))) - {s_node})
+    t_nbrs = len((set(G.predecessors(t_node)) | set(G.successors(t_node))) - {t_node})
+    if s_nbrs <= 1 or t_nbrs <= 1:
+        st.info("ℹ️ **Lưu ý:** Điểm chọn nằm trong ngõ hoặc gần mép ranh giới — hệ thống điều hướng phương tiện quay đầu/chạy ra trục đường chính và di chuyển đến đích bình thường.")
 elif both_set and not route_calculated:
     if routing_error:
         st.error(routing_error)
