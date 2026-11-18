@@ -1,11 +1,3 @@
-"""
-Module quản lý dữ liệu, thí nghiệm tìm đường và so sánh hiệu năng giữa Dijkstra và A*.
-Đáp ứng đầy đủ các tiêu chí Chủ đề 01:
-- 10 ca thử nghiệm S/T (5 gần, 5 xa)
-- Bảng so sánh: Chiều dài, Thời gian (ms), Số nút duyệt
-- 3 trường hợp khó: Đường 1 chiều, Không có đường đi, Đường vòng dài
-- Phân tích khi nào A* có lợi
-"""
 import sys
 import time
 from pathlib import Path

@@ -1,11 +1,3 @@
-"""
-Các thuật toán tìm đường ngắn nhất tối ưu: Dijkstra và A*.
-Đã được tối ưu hóa:
-1. Heuristic Haversine tiền tính góc lượng giác và Memoization Cache.
-2. Duyệt kề trực tiếp qua NetworkX Adjacency Mapping (loại bỏ chi phí hàm get lặp).
-3. Min-Heap Tie-breaking ưu tiên mục tiêu để hội tụ nhanh.
-4. Tương thích 100% định dạng Node ID (int/str) và hỗ trợ trọng số tắc đường (traffic_weights).
-"""
 import heapq
 import math
 import time

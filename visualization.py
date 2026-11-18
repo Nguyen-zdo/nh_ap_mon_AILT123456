@@ -1,10 +1,3 @@
-"""
-Vẽ mạng đường và xuất các tuyến mẫu (gần, xa, đường vòng) để dán vào báo cáo.
-Đáp ứng tiêu chí Chủ đề 01:
-- Xuất ảnh tổng quan mạng lưới đường bộ (results/network.png).
-- Xuất ảnh 3 tuyến đường tiêu biểu (results/route_1_short.png, route_2_long.png, route_3_detour.png).
-- Tương thích cả OSMnx lẫn thuần Matplotlib / NetworkX.
-"""
 import json
 import sys
 from pathlib import Path

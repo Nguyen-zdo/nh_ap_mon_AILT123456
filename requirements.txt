@@ -1,0 +1,15 @@
+# Thư viện mạng đường bộ & đồ thị
+osmnx>=1.9.0
+networkx>=3.0
+
+# Giao diện web & bản đồ tương tác
+streamlit>=1.30.0
+folium>=0.15.0
+streamlit-folium>=0.17.0
+
+# Xử lý không gian địa lý
+geopandas>=0.14.0
+shapely>=2.0.0
+
+# Vẽ đồ thị & xuất ảnh báo cáo
+matplotlib>=3.8.0

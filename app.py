@@ -1,4 +1,3 @@
-"""Demo Streamlit: Tìm đường giao hàng ngắn nhất bằng Dijkstra & A* (Google Maps Style)."""
 import json
 from pathlib import Path
 import osmnx as ox

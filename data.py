@@ -1,16 +1,3 @@
-"""
-Tải mạng đường bộ từ OpenStreetMap bằng OSMnx, làm sạch, kiểm tra, lưu để tái lập.
-
-Cách chạy:
-    python data.py                             # tải mạng đường mở rộng Hoàn Kiếm & Ba Đình
-    python data.py --district both             # gộp cả 2 quận: Hoàn Kiếm & Ba Đình (~14.5 km²)
-    python data.py --district ba_dinh          # chỉ riêng quận Ba Đình (~9.3 km²)
-    python data.py --district hoan_kiem        # chỉ riêng quận Hoàn Kiếm cũ (~5.2 km²)
-    python data.py --force                     # tải lại và ghi đè dữ liệu cũ
-
-Đầu ra (thư mục data/): area_raw.graphml, area_clean.graphml, graph_meta.json, graph_overview.png
-Dữ liệu: © OpenStreetMap contributors, giấy phép ODbL.
-"""
 import argparse
 import json
 import sys
